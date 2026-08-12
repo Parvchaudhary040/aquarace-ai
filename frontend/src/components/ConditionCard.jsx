@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sun, CloudRain, Droplets, Zap } from 'lucide-react';
 
-export default function ConditionCard({ condition, confidence, isLoading }) {
+export default function ConditionCard({ condition: propCond, confidence: propConf, analysis, isLoading }) {
   if (isLoading) {
     return (
       <div className="telemetry-card corner-bracket rounded-2xl p-5 border border-slate-800 animate-pulse flex flex-col justify-between h-full">
@@ -12,7 +12,10 @@ export default function ConditionCard({ condition, confidence, isLoading }) {
     );
   }
 
-  const cond = condition ? condition.toUpperCase() : 'NO DATA';
+  const rawCond = analysis?.condition || propCond;
+  const confidence = analysis?.confidence ?? propConf;
+
+  const cond = rawCond ? String(rawCond).toUpperCase() : 'NO DATA';
 
   let config = {
     color: 'text-slate-400',
@@ -50,6 +53,15 @@ export default function ConditionCard({ condition, confidence, isLoading }) {
       icon: <Droplets className="w-10 h-10 text-cyan-400 animate-bounce" />,
       description: 'Heavy moisture / standing water. High aquaplaning risk.'
     };
+  } else if (cond === 'DRYING') {
+    config = {
+      color: 'text-amber-300',
+      bg: 'bg-amber-400/10',
+      border: 'border-amber-400/30',
+      glow: 'shadow-[0_0_25px_rgba(251,191,36,0.25)]',
+      icon: <Sun className="w-10 h-10 text-amber-300" />,
+      description: 'Track line drying rapidly across racing apex.'
+    };
   }
 
   return (
@@ -85,7 +97,7 @@ export default function ConditionCard({ condition, confidence, isLoading }) {
       <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
         <span className="text-slate-400 uppercase">AI Confidence Score</span>
         <span className={`font-bold text-sm ${confidence > 75 ? 'text-emerald-400' : 'text-amber-400'}`}>
-          {confidence != null ? `${confidence.toFixed(2)}%` : '--'}
+          {confidence != null ? `${Number(confidence).toFixed(2)}%` : '--'}
         </span>
       </div>
 

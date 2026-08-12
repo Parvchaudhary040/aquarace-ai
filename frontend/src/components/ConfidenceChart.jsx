@@ -1,12 +1,16 @@
 import React from 'react';
 import { BarChart2, Sun, CloudRain, Droplets } from 'lucide-react';
 
-export default function ConfidenceChart({ dryProb = 0, dampProb = 0, wetProb = 0, isLoading }) {
+export default function ConfidenceChart({ dryProb = 0, dampProb = 0, wetProb = 0, analysis, isLoading }) {
+  const finalDry = analysis?.dry_probability ?? dryProb;
+  const finalDamp = analysis?.damp_probability ?? dampProb;
+  const finalWet = analysis?.wet_probability ?? wetProb;
+
   const items = [
     {
       label: 'Dry Track',
       key: 'dry',
-      val: dryProb,
+      val: finalDry,
       color: 'bg-amber-500',
       textColor: 'text-amber-400',
       border: 'border-amber-500/30',
@@ -15,7 +19,7 @@ export default function ConfidenceChart({ dryProb = 0, dampProb = 0, wetProb = 0
     {
       label: 'Damp Track',
       key: 'damp',
-      val: dampProb,
+      val: finalDamp,
       color: 'bg-sky-500',
       textColor: 'text-sky-400',
       border: 'border-sky-500/30',
@@ -24,7 +28,7 @@ export default function ConfidenceChart({ dryProb = 0, dampProb = 0, wetProb = 0
     {
       label: 'Wet Track',
       key: 'wet',
-      val: wetProb,
+      val: finalWet,
       color: 'bg-cyan-500',
       textColor: 'text-cyan-400',
       border: 'border-cyan-500/30',

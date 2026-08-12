@@ -1,13 +1,13 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Accept': 'application/json',
   },
-  timeout: 60000, // 60s timeout for model inference
+  timeout: 60000, // 60s timeout for HF model inference
 });
 
 /**
