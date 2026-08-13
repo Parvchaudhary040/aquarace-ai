@@ -1,15 +1,41 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { isWebGLAvailable } from '../../utils/webglDetect';
 
-export default function RaceTrackScene() {
+/**
+ * RaceTrackScene — Three.js 3D race track background.
+ *
+ * Fault-tolerant:
+ *  - Checks WebGL availability before creating the renderer.
+ *  - Wraps renderer creation in try/catch.
+ *  - Calls onWebGLFailed() if anything goes wrong.
+ *  - Fully cleans up on unmount (renderer, geometries, materials,
+ *    animation frame, event listeners).
+ *
+ * @param {Function} [onWebGLFailed] - called when WebGL is unavailable or fails
+ */
+export default function RaceTrackScene({ onWebGLFailed }) {
   const containerRef = useRef(null);
+  // StrictMode double-invocation guard
+  const initDoneRef = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const width = container.clientWidth;
-    const height = container.clientHeight;
+    // ── 1. Pre-flight WebGL detection ──────────────────────────
+    if (!isWebGLAvailable()) {
+      console.warn('[RaceTrackScene] WebGL unavailable — activating CSS fallback.');
+      if (onWebGLFailed) onWebGLFailed();
+      return;
+    }
+
+    // ── 2. StrictMode guard ────────────────────────────────────
+    if (initDoneRef.current) return;
+    initDoneRef.current = true;
+
+    const width = container.clientWidth || window.innerWidth;
+    const height = container.clientHeight || window.innerHeight;
 
     // 1. Scene & Fog
     const scene = new THREE.Scene();
@@ -20,12 +46,19 @@ export default function RaceTrackScene() {
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(0, 7, 16);
 
-    // 3. WebGL Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    container.appendChild(renderer.domElement);
+    // ── 3. WebGL Renderer — wrapped in try/catch ───────────────
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      container.appendChild(renderer.domElement);
+    } catch (err) {
+      console.warn('[RaceTrackScene] THREE.WebGLRenderer failed:', err);
+      if (onWebGLFailed) onWebGLFailed();
+      return;
+    }
 
     // 4. Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -146,19 +179,45 @@ export default function RaceTrackScene() {
       marker1.position.y = Math.sin(time * 3) * 0.25 + 0.5;
       marker2.position.y = Math.sin(time * 3 + 1) * 0.25 + 1.2;
 
-      renderer.render(scene, camera);
+      try {
+        renderer.render(scene, camera);
+      } catch (err) {
+        console.warn('[RaceTrackScene] Render error — stopping animation:', err);
+        cancelAnimationFrame(animationFrameId);
+        if (onWebGLFailed) onWebGLFailed();
+      }
     };
     animate();
 
     return () => {
+      initDoneRef.current = false;
+
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationFrameId);
-      if (renderer.domElement && container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+
+      // Dispose geometries & materials
+      trackGeometry.dispose();
+      trackMaterial.dispose();
+      leftGeom.dispose();
+      rightGeom.dispose();
+      centerGeom.dispose();
+      sphereGeom.dispose();
+      markerMatCyan.dispose();
+      markerMatAmber.dispose();
+      leftLine.material.dispose();
+      rightLine.material.dispose();
+      centerLine.material.dispose();
+      scene.clear();
+
+      if (renderer) {
+        renderer.dispose();
+        if (renderer.domElement && container.contains(renderer.domElement)) {
+          container.removeChild(renderer.domElement);
+        }
       }
-      renderer.dispose();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

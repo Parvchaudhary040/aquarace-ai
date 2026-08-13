@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { BloomEffect, EffectComposer, EffectPass, RenderPass, SMAAEffect, SMAAPreset } from 'postprocessing';
+import { isWebGLAvailable } from '../../utils/webglDetect';
 import './Hyperspeed.css';
 
 const defaultOptions = {
@@ -1188,11 +1189,38 @@ class App {
 
 const DEFAULT_EFFECT_OPTIONS = {};
 
-const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
+/**
+ * Hyperspeed — Three.js hyperspeed road effect.
+ *
+ * Fault-tolerant:
+ *  - Checks WebGL availability before creating the App.
+ *  - Wraps App construction in try/catch.
+ *  - Guards against React StrictMode double-invocation.
+ *  - Calls onWebGLFailed() if anything goes wrong so the parent
+ *    can switch to the CSS fallback immediately.
+ *
+ * @param {object} effectOptions - Hyperspeed visual configuration
+ * @param {Function} [onWebGLFailed] - called when WebGL is unavailable or fails
+ */
+const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS, onWebGLFailed }) => {
   const hyperspeed = useRef(null);
   const appRef = useRef(null);
+  // Guards against StrictMode double-mount creating two renderers
+  const initDoneRef = useRef(false);
 
   useEffect(() => {
+    // ── 1. Pre-flight WebGL detection ──────────────────────────
+    if (!isWebGLAvailable()) {
+      console.warn('[Hyperspeed] WebGL unavailable — activating CSS fallback.');
+      if (onWebGLFailed) onWebGLFailed();
+      return;
+    }
+
+    // ── 2. StrictMode guard — skip if already initialised ──────
+    if (initDoneRef.current) return;
+    initDoneRef.current = true;
+
+    // ── 3. Dispose any previous App instance ───────────────────
     if (appRef.current) {
       appRef.current.dispose();
       appRef.current = null;
@@ -1216,15 +1244,43 @@ const Hyperspeed = ({ effectOptions = DEFAULT_EFFECT_OPTIONS }) => {
       options.distortion = distortions[options.distortion];
     }
 
-    const myApp = new App(container, options);
+    // ── 4. Create App with try/catch ───────────────────────────
+    let myApp;
+    try {
+      myApp = new App(container, options);
+    } catch (err) {
+      console.warn('[Hyperspeed] THREE.WebGLRenderer failed to initialise:', err);
+      if (onWebGLFailed) onWebGLFailed();
+      return;
+    }
+
     appRef.current = myApp;
-    myApp.loadAssets().then(myApp.init);
+
+    // ── 5. Load assets and start — catch async failures too ────
+    myApp.loadAssets().then(() => {
+      try {
+        // Verify context is still valid after asset loading
+        if (!myApp.renderer || !myApp.renderer.getContext()) {
+          throw new Error('WebGL context lost after asset load.');
+        }
+        myApp.init();
+      } catch (err) {
+        console.warn('[Hyperspeed] Init failed after asset load:', err);
+        if (onWebGLFailed) onWebGLFailed();
+      }
+    }).catch(err => {
+      console.warn('[Hyperspeed] Asset loading failed:', err);
+      if (onWebGLFailed) onWebGLFailed();
+    });
 
     return () => {
+      initDoneRef.current = false;
       if (appRef.current) {
         appRef.current.dispose();
+        appRef.current = null;
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectOptions]);
 
   return <div id="lights" ref={hyperspeed}></div>;

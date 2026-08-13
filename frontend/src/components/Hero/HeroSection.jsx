@@ -1,15 +1,36 @@
-import React, { useRef, useMemo, useState } from 'react';
+import React, { useRef, useMemo, useState, useCallback } from 'react';
 import RaceTrackScene from '../3d/RaceTrackScene';
 import Hyperspeed from '../Hyperspeed/Hyperspeed';
+import WebGLFallbackBackground from '../WebGLFallbackBackground';
 import SystemStatus from '../SystemStatus';
 import { Gauge, ChevronDown, Sparkles, Radio, Zap, Image as ImageIcon, Film } from 'lucide-react';
 import { useScrollAnimation } from '../../hooks/useScrollAnimation';
 
+/**
+ * HeroSection
+ *
+ * Renders the hero with a switchable 3D background (Hyperspeed / RaceTrack).
+ * Fault-tolerant architecture:
+ *   WebGL available  → Three.js background (Hyperspeed or RaceTrackScene)
+ *   WebGL unavailable / failed → WebGLFallbackBackground (pure CSS, premium)
+ *
+ * The main UI is rendered first; 3D initialization is non-blocking.
+ * A WebGL failure in either background component is caught here via
+ * the onWebGLFailed callback and switches silently to the CSS fallback.
+ */
 export default function HeroSection({ onStatusChange, onStartAnalysis, onSetMode }) {
   const contentRef = useRef();
   useScrollAnimation(contentRef, 'fadeUp');
 
   const [bgMode, setBgMode] = useState('hyperspeed');
+
+  // When any 3D component reports a WebGL failure, switch globally to the
+  // CSS fallback. useCallback prevents unnecessary child re-renders.
+  const [webglFailed, setWebglFailed] = useState(false);
+  const handleWebGLFailed = useCallback(() => {
+    console.warn('[HeroSection] WebGL failure reported — switching to CSS fallback.');
+    setWebglFailed(true);
+  }, []);
 
   const hyperspeedOptions = useMemo(
     () => ({
@@ -50,19 +71,38 @@ export default function HeroSection({ onStatusChange, onStartAnalysis, onSetMode
     []
   );
 
+  /**
+   * Renders the background layer.
+   * If WebGL has already failed, always use the CSS fallback.
+   */
+  const renderBackground = () => {
+    if (webglFailed) {
+      return <WebGLFallbackBackground />;
+    }
+
+    if (bgMode === 'hyperspeed') {
+      return (
+        <div className="relative w-full h-full">
+          <Hyperspeed
+            effectOptions={hyperspeedOptions}
+            onWebGLFailed={handleWebGLFailed}
+          />
+          <div className="absolute inset-0 bg-slate-950/40 pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#020617_90%)]" />
+        </div>
+      );
+    }
+
+    return (
+      <RaceTrackScene onWebGLFailed={handleWebGLFailed} />
+    );
+  };
+
   return (
     <section className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden bg-slate-950 border-b border-slate-800/80">
       
-      {/* Background Visual Scene */}
+      {/* Background Visual Scene — non-blocking, fails gracefully */}
       <div className="absolute inset-0 z-0 pointer-events-auto">
-        {bgMode === 'hyperspeed' ? (
-          <div className="relative w-full h-full">
-            <Hyperspeed effectOptions={hyperspeedOptions} />
-            <div className="absolute inset-0 bg-slate-950/40 pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#020617_90%)]" />
-          </div>
-        ) : (
-          <RaceTrackScene />
-        )}
+        {renderBackground()}
       </div>
 
       {/* Top Navbar Overlay */}
@@ -82,14 +122,17 @@ export default function HeroSection({ onStatusChange, onStartAnalysis, onSetMode
         </div>
 
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setBgMode((prev) => (prev === 'hyperspeed' ? 'track' : 'hyperspeed'))}
-            className="hidden sm:flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-900/80 transition-all backdrop-blur-md cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-            title="Toggle Background Visual Effect"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            <span>BG: {bgMode === 'hyperspeed' ? 'HYPERSPEED' : '3D TRACK'}</span>
-          </button>
+          {/* BG mode toggle — only show when WebGL is working */}
+          {!webglFailed && (
+            <button
+              onClick={() => setBgMode((prev) => (prev === 'hyperspeed' ? 'track' : 'hyperspeed'))}
+              className="hidden sm:flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-900/80 transition-all backdrop-blur-md cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+              title="Toggle Background Visual Effect"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span>BG: {bgMode === 'hyperspeed' ? 'HYPERSPEED' : '3D TRACK'}</span>
+            </button>
+          )}
 
           <div className="hidden md:flex items-center gap-2 text-xs font-mono text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 backdrop-blur-md">
             <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
