@@ -15,6 +15,15 @@ AquaRace AI is a full-stack motorsport intelligence dashboard designed to analyz
 
 ---
 
+## 📸 Live Demo
+
+<a href="https://aquarace-ai.vercel.app" target="_blank">
+  <img src="/public/landingpage.png" alt="Preview" width="100%">
+</a>
+
+---
+
+
 ## ✨ Key Features
 
 ### 🖼️ AI Image Analysis
