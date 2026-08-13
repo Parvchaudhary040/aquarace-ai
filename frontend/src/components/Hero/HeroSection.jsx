@@ -1,19 +1,68 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo, useState } from 'react';
 import RaceTrackScene from '../3d/RaceTrackScene';
+import Hyperspeed from '../Hyperspeed/Hyperspeed';
 import SystemStatus from '../SystemStatus';
-import { Gauge, ChevronDown, Sparkles, Radio } from 'lucide-react';
+import { Gauge, ChevronDown, Sparkles, Radio, Zap } from 'lucide-react';
 import { useScrollAnimation } from '../../hooks/useScrollAnimation';
 
 export default function HeroSection({ onStatusChange, onStartAnalysis }) {
   const contentRef = useRef();
   useScrollAnimation(contentRef, 'fadeUp');
 
+  const [bgMode, setBgMode] = useState('hyperspeed');
+
+  const hyperspeedOptions = useMemo(
+    () => ({
+      distortion: 'turbulentDistortion',
+      length: 400,
+      roadWidth: 10,
+      islandWidth: 2,
+      lanesPerRoad: 4,
+      fov: 90,
+      fovSpeedUp: 150,
+      speedUp: 2,
+      carLightsFade: 0.4,
+      totalSideLightSticks: 25,
+      lightPairsPerRoadWay: 40,
+      shoulderLinesWidthPercentage: 0.05,
+      brokenLinesWidthPercentage: 0.1,
+      brokenLinesLengthPercentage: 0.5,
+      lightStickWidth: [0.12, 0.5],
+      lightStickHeight: [1.3, 1.7],
+      movingAwaySpeed: [60, 80],
+      movingCloserSpeed: [-120, -160],
+      carLightsLength: [400 * 0.03, 400 * 0.2],
+      carLightsRadius: [0.05, 0.14],
+      carWidthPercentage: [0.3, 0.5],
+      carShiftX: [-0.8, 0.8],
+      carFloorSeparation: [0, 5],
+      colors: {
+        roadColor: 0x080808,
+        islandColor: 0x0a0a0a,
+        background: 0x020617,
+        shoulderLines: 0xffffff,
+        brokenLines: 0xffffff,
+        leftCars: [0xd856bf, 0x6750a2, 0xc247ac],
+        rightCars: [0x03b3c3, 0x0e5ea5, 0x324555],
+        sticks: 0x03b3c3
+      }
+    }),
+    []
+  );
+
   return (
     <section className="relative w-full min-h-screen flex flex-col justify-between overflow-hidden bg-slate-950 border-b border-slate-800/80">
       
-      {/* 3D Track Background Scene */}
-      <div className="absolute inset-0 z-0">
-        <RaceTrackScene />
+      {/* Background Visual Scene */}
+      <div className="absolute inset-0 z-0 pointer-events-auto">
+        {bgMode === 'hyperspeed' ? (
+          <div className="relative w-full h-full">
+            <Hyperspeed effectOptions={hyperspeedOptions} />
+            <div className="absolute inset-0 bg-slate-950/40 pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#020617_90%)]" />
+          </div>
+        ) : (
+          <RaceTrackScene />
+        )}
       </div>
 
       {/* Top Navbar Overlay */}
@@ -33,6 +82,15 @@ export default function HeroSection({ onStatusChange, onStartAnalysis }) {
         </div>
 
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setBgMode((prev) => (prev === 'hyperspeed' ? 'track' : 'hyperspeed'))}
+            className="hidden sm:flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-lg bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-900/80 transition-all backdrop-blur-md cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+            title="Toggle Background Visual Effect"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <span>BG: {bgMode === 'hyperspeed' ? 'HYPERSPEED' : '3D TRACK'}</span>
+          </button>
+
           <div className="hidden md:flex items-center gap-2 text-xs font-mono text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800 backdrop-blur-md">
             <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
             <span>TELEMETRY FEED 01</span>
