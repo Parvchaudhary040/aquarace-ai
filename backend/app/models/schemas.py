@@ -34,3 +34,21 @@ class StrategyResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+
+
+class FrameAnalysisItem(BaseModel):
+    timestamp: float
+    condition: str
+    confidence: float
+    dry_probability: float = 0.0
+    damp_probability: float = 0.0
+    wet_probability: float = 0.0
+
+
+class VideoAnalysisResponse(BaseModel):
+    filename: str
+    frames_analyzed: int
+    frames: List[FrameAnalysisItem]
+    condition_sequence: List[str]
+    trend: TrendResponse
+    strategy: StrategyResponse

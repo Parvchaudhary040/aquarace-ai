@@ -1,30 +1,17 @@
 import React from 'react';
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ReferenceLine
-} from 'recharts';
-import { TrendingUp, TrendingDown, Minus, Activity } from 'lucide-react';
-
-const SCORE_MAP = {
-  Dry: 0,
-  Damp: 1,
-  Wet: 2
-};
+import { TrendingUp, TrendingDown, Minus, Activity, ChevronRight } from 'lucide-react';
 
 export default function TrendChart({ sequence = [], trend = 'stable', message = '', isLoading }) {
-
-  // Prepare chart data from sequence array
-  const chartData = sequence.map((cond, idx) => ({
-    step: `Sample #${idx + 1}`,
-    condition: cond,
-    score: SCORE_MAP[cond] != null ? SCORE_MAP[cond] : 0,
-  }));
+  
+  if (isLoading) {
+    return (
+      <div className="telemetry-card corner-bracket rounded-2xl p-5 border border-slate-800 animate-pulse flex flex-col justify-between h-full min-h-[200px]">
+        <div className="h-4 bg-slate-800 rounded w-1/3 mb-4"></div>
+        <div className="h-8 bg-slate-800 rounded w-full my-4"></div>
+        <div className="h-16 bg-slate-800 rounded w-full"></div>
+      </div>
+    );
+  }
 
   const trendLower = (trend || 'stable').toLowerCase();
 
@@ -33,125 +20,89 @@ export default function TrendChart({ sequence = [], trend = 'stable', message = 
     color: 'text-sky-400',
     bg: 'bg-sky-500/10',
     border: 'border-sky-500/30',
-    icon: <Minus className="w-4 h-4 text-sky-400" />
+    icon: <Minus className="w-6 h-6 text-sky-400" />
   };
 
   if (trendLower === 'improving') {
     trendBadge = {
-      label: 'IMPROVING (DRYING)',
+      label: '↑ IMPROVING',
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10',
       border: 'border-emerald-500/30',
-      icon: <TrendingDown className="w-4 h-4 text-emerald-400" />
+      icon: <TrendingUp className="w-6 h-6 text-emerald-400" />
     };
   } else if (trendLower === 'deteriorating') {
     trendBadge = {
-      label: 'DETERIORATING (WETTING)',
+      label: '↓ WORSENING',
       color: 'text-rose-400',
       bg: 'bg-rose-500/10',
       border: 'border-rose-500/30',
-      icon: <TrendingUp className="w-4 h-4 text-rose-400" />
+      icon: <TrendingDown className="w-6 h-6 text-rose-400" />
     };
   }
 
-  // Custom tooltip for Recharts
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="telemetry-card p-2.5 rounded-lg border border-slate-700 bg-slate-900/90 text-xs font-mono">
-          <p className="text-slate-400">{data.step}</p>
-          <p className="font-bold text-cyan-400">Condition: {data.condition}</p>
-        </div>
-      );
-    }
-    return null;
+  const getConditionColor = (cond) => {
+    const c = (cond || '').toLowerCase();
+    if (c === 'wet') return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40';
+    if (c === 'damp') return 'bg-amber-500/20 text-amber-400 border-amber-500/40';
+    if (c === 'drying') return 'bg-sky-500/20 text-sky-300 border-sky-500/40';
+    if (c === 'dry') return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
+    return 'bg-slate-500/20 text-slate-400 border-slate-500/40';
   };
 
   return (
-    <div className="telemetry-card corner-bracket rounded-2xl p-5 border border-slate-800 flex flex-col justify-between">
+    <div className="telemetry-card corner-bracket rounded-2xl p-6 border border-slate-800 flex flex-col justify-between h-full relative overflow-hidden">
       
+      {/* Background Glow based on trend */}
+      <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl opacity-10 pointer-events-none ${trendBadge.color.replace('text', 'bg')}`} />
+
       {/* Header & Trend Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-6 relative z-10">
         <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-slate-200">
-            Track Moisture Trend Analysis
+          <Activity className="w-5 h-5 text-cyan-400" />
+          <h3 className="text-sm font-mono font-bold tracking-wider uppercase text-slate-200">
+            Condition Transition Flow
           </h3>
         </div>
 
-        {/* Trend Badge */}
-        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-md border ${trendBadge.border} ${trendBadge.bg} text-xs font-mono font-bold`}>
+        {/* Big Trend Badge */}
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${trendBadge.border} ${trendBadge.bg} text-sm font-mono font-black shadow-lg`}>
           {trendBadge.icon}
           <span className={trendBadge.color}>{trendBadge.label}</span>
         </div>
       </div>
 
-      {/* Message Rationale */}
-      {message && (
-        <p className="text-xs text-slate-400 font-mono mb-3 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/80">
-          <span className="text-cyan-400 font-bold">STATUS:</span> {message}
-        </p>
-      )}
-
-      {/* Recharts Area Visualization */}
-      <div className="h-44 w-full my-2">
-        {chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-              <defs>
-                <linearGradient id="moistureGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-              
-              <XAxis
-                dataKey="step"
-                stroke="#64748b"
-                fontSize={10}
-                fontFamily="monospace"
-                tickLine={false}
-              />
-
-              <YAxis
-                domain={[0, 2]}
-                ticks={[0, 1, 2]}
-                tickFormatter={(val) => (val === 0 ? 'Dry' : val === 1 ? 'Damp' : 'Wet')}
-                stroke="#64748b"
-                fontSize={10}
-                fontFamily="monospace"
-                tickLine={false}
-              />
-
-              <Tooltip content={<CustomTooltip />} />
-
-              <Area
-                type="monotone"
-                dataKey="score"
-                stroke="#06b6d4"
-                strokeWidth={2.5}
-                fillOpacity={1}
-                fill="url(#moistureGradient)"
-                dot={{ r: 4, fill: '#06b6d4', stroke: '#0f172a', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: '#38bdf8', stroke: '#06b6d4', strokeWidth: 2 }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+      {/* Flowchart Sequence */}
+      <div className="my-4 relative z-10">
+        {sequence && sequence.length > 0 ? (
+          <div className="flex flex-wrap items-center justify-center gap-3 p-6 rounded-xl bg-slate-900/80 border border-slate-800/80 shadow-inner">
+            {sequence.map((cond, i) => (
+              <React.Fragment key={i}>
+                <div className={`text-lg sm:text-xl font-mono font-black uppercase px-6 py-3 rounded-xl border-2 ${getConditionColor(cond)} shadow-lg transform transition-transform hover:scale-105`}>
+                  {cond}
+                </div>
+                {i < sequence.length - 1 && (
+                  <ChevronRight className="w-8 h-8 text-slate-600 shrink-0" strokeWidth={3} />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
         ) : (
-          <div className="h-full w-full flex items-center justify-center border border-dashed border-slate-800 rounded-xl bg-slate-900/40 text-slate-500 text-xs font-mono">
-            No sequence data available yet
+          <div className="p-8 flex items-center justify-center border border-dashed border-slate-800 rounded-xl bg-slate-900/40 text-slate-500 text-sm font-mono uppercase tracking-widest">
+            No sequence data available
           </div>
         )}
       </div>
 
-      {/* Legend / Info */}
-      <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-500">
-        <span>SEQUENCE STEPS: {sequence.length}</span>
-        <span>SEVERITY INDEX: DRY(0) &rarr; WET(2)</span>
-      </div>
+      {/* Backend Explanation Message */}
+      {message && (
+        <div className="mt-4 p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-sm text-slate-300 font-sans leading-relaxed relative z-10">
+          <span className="font-bold text-cyan-400 font-mono uppercase block mb-1">
+            Backend Analysis:
+          </span>
+          {message}
+        </div>
+      )}
 
     </div>
   );

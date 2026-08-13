@@ -2,8 +2,9 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import Analysis
-from app.models.schemas import AnalysisResponse
+from app.models.schemas import AnalysisResponse, VideoAnalysisResponse
 from app.services.vision_service import vision_service
+from app.services.video_service import video_service
 
 router = APIRouter()
 
@@ -56,3 +57,41 @@ async def analyze_image(
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=f"Image analysis error: {str(e)}")
+
+
+@router.post("/analyze-video", response_model=VideoAnalysisResponse)
+async def analyze_video(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Extracts frames from an uploaded track video, runs CLIP vision classification across frames,
+    computes temporal trend and tire strategy, and saves frame summary to database history.
+    """
+    filename = file.filename or "race_track.mp4"
+
+    try:
+        video_bytes = await file.read()
+
+        # Process video frames, trend, and strategy
+        result = video_service.process_video(video_bytes, filename)
+
+        # Record each analyzed frame (or latest frame) to DB history so telemetry log stays in sync
+        for frame in result["frames"]:
+            db_analysis = Analysis(
+                filename=f"{filename} @ {frame['timestamp']}s",
+                condition=frame["condition"],
+                confidence=frame["confidence"],
+                dry_probability=frame.get("dry_probability", 0.0),
+                damp_probability=frame.get("damp_probability", 0.0),
+                wet_probability=frame.get("wet_probability", 0.0)
+            )
+            db.add(db_analysis)
+        db.commit()
+
+        return result
+
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Video analysis error: {str(e)}")

@@ -49,10 +49,10 @@ class VisionService:
             image = Image.open(io.BytesIO(image_input)).convert("RGB")
         elif isinstance(image_input, (str, Path)):
             image = Image.open(str(image_input)).convert("RGB")
-        elif isinstance(image_input, Image.Image):
-            image = image.convert("RGB")
+        elif hasattr(image_input, "convert"):
+            image = image_input.convert("RGB")
         else:
-            raise ValueError("Unsupported image input type. Expected bytes, file path, or PIL Image.")
+            raise ValueError(f"Unsupported image input type '{type(image_input)}'. Expected bytes, file path, or PIL Image.")
 
         raw_results = self._classifier(image, candidate_labels=CANDIDATE_LABELS)
 

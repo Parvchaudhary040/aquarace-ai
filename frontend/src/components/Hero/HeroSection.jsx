@@ -2,10 +2,10 @@ import React, { useRef, useMemo, useState } from 'react';
 import RaceTrackScene from '../3d/RaceTrackScene';
 import Hyperspeed from '../Hyperspeed/Hyperspeed';
 import SystemStatus from '../SystemStatus';
-import { Gauge, ChevronDown, Sparkles, Radio, Zap } from 'lucide-react';
+import { Gauge, ChevronDown, Sparkles, Radio, Zap, Image as ImageIcon, Film } from 'lucide-react';
 import { useScrollAnimation } from '../../hooks/useScrollAnimation';
 
-export default function HeroSection({ onStatusChange, onStartAnalysis }) {
+export default function HeroSection({ onStatusChange, onStartAnalysis, onSetMode }) {
   const contentRef = useRef();
   useScrollAnimation(contentRef, 'fadeUp');
 
@@ -119,17 +119,23 @@ export default function HeroSection({ onStatusChange, onStartAnalysis }) {
             AI-powered visual analysis for evolving race conditions and tire strategy.
           </p>
 
-          <div className="flex flex-wrap items-center gap-4 pt-2">
-            <button
-              onClick={onStartAnalysis}
-              className="px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-950 font-black font-mono text-xs sm:text-sm uppercase tracking-widest shadow-[0_0_25px_rgba(6,182,212,0.4)] transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3"
-            >
-              <span>Start Analysis</span>
-              <ChevronDown className="w-4 h-4 text-slate-950" />
-            </button>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-2">
+            <div className="flex items-center gap-3 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-700 backdrop-blur-md shadow-[0_0_30px_rgba(6,182,212,0.15)]">
+              <button
+                onClick={() => onSetMode ? onSetMode('image') : onStartAnalysis()}
+                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-950 font-black font-mono text-xs uppercase tracking-widest transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2"
+              >
+                <ImageIcon className="w-4 h-4" />
+                <span>Image Analysis</span>
+              </button>
 
-            <div className="text-xs font-mono text-slate-400 px-4 py-3 rounded-xl bg-slate-900/60 border border-slate-800 backdrop-blur-md">
-              <span className="text-cyan-400 font-bold">MODEL:</span> OPENAI CLIP VIT-BASE-32
+              <button
+                onClick={() => onSetMode ? onSetMode('video') : onStartAnalysis()}
+                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black font-mono text-xs uppercase tracking-widest transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2"
+              >
+                <Film className="w-4 h-4" />
+                <span>Video Analysis</span>
+              </button>
             </div>
           </div>
 

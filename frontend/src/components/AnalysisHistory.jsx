@@ -7,7 +7,7 @@ export default function AnalysisHistory({ history = [], isLoading, onSelectRecor
     if (!isoString) return '--';
     try {
       const date = new Date(isoString);
-      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' - ' + date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     } catch {
       return isoString;
     }
@@ -15,25 +15,25 @@ export default function AnalysisHistory({ history = [], isLoading, onSelectRecor
 
   const getBadgeClass = (cond) => {
     const uppercase = (cond || '').toUpperCase();
-    if (uppercase === 'DRY') return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
-    if (uppercase === 'DAMP') return 'bg-sky-500/10 text-sky-400 border-sky-500/30';
-    if (uppercase === 'WET') return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
-    return 'bg-slate-800 text-slate-400 border-slate-700';
+    if (uppercase === 'DRY') return 'text-amber-400 border-amber-500/30';
+    if (uppercase === 'DAMP') return 'text-sky-400 border-sky-500/30';
+    if (uppercase === 'WET') return 'text-cyan-400 border-cyan-500/30';
+    return 'text-slate-500 border-slate-700';
   };
 
   return (
-    <div className="telemetry-card corner-bracket rounded-2xl p-5 border border-slate-800">
+    <div className="telemetry-card corner-bracket rounded-2xl p-6 border border-slate-800/80 bg-slate-950">
       
       {/* Table Header Title */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-        <div className="flex items-center gap-2">
-          <History className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-xs font-mono font-bold tracking-wider uppercase text-slate-200">
-            Telemetry Analysis History Log
+      <div className="flex items-center justify-between pb-4 mb-2">
+        <div className="flex items-center gap-3">
+          <History className="w-5 h-5 text-cyan-500/60" />
+          <h3 className="text-xs font-mono font-bold tracking-widest uppercase text-slate-300">
+            Analysis History Log
           </h3>
         </div>
-        <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded border border-slate-800">
-          SQLITE AUDIT LOG ({history.length} RECORDS)
+        <span className="text-[10px] font-mono text-slate-500">
+          {history.length} RECORDS
         </span>
       </div>
 
@@ -41,26 +41,26 @@ export default function AnalysisHistory({ history = [], isLoading, onSelectRecor
       <div className="overflow-x-auto">
         <table className="w-full text-left font-mono text-xs">
           <thead>
-            <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider bg-slate-900/60">
-              <th className="py-2.5 px-3">ID</th>
-              <th className="py-2.5 px-3">Timestamp</th>
-              <th className="py-2.5 px-3">Filename</th>
-              <th className="py-2.5 px-3">Condition</th>
-              <th className="py-2.5 px-3 text-right">Confidence</th>
+            <tr className="text-slate-600 uppercase text-[9px] tracking-widest border-b border-slate-800/50">
+              <th className="py-2 px-2 font-normal">ID</th>
+              <th className="py-2 px-2 font-normal">Time</th>
+              <th className="py-2 px-2 font-normal">File</th>
+              <th className="py-2 px-2 font-normal">Result</th>
+              <th className="py-2 px-2 font-normal text-right">Conf</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60">
+          <tbody className="divide-y divide-slate-800/30">
             {isLoading && history.length === 0 ? (
               <tr>
-                <td colSpan="5" className="py-6 text-center text-slate-500">
-                  <Clock className="w-5 h-5 animate-spin mx-auto mb-2 text-cyan-400" />
-                  Loading telemetry log history...
+                <td colSpan="5" className="py-10 text-center text-slate-600">
+                  <Clock className="w-5 h-5 animate-spin mx-auto mb-3 text-slate-500" />
+                  Loading telemetry logs...
                 </td>
               </tr>
             ) : history.length === 0 ? (
               <tr>
-                <td colSpan="5" className="py-6 text-center text-slate-500">
-                  No analysis records stored in database yet. Upload a track image above to record inference telemetry.
+                <td colSpan="5" className="py-10 text-center text-slate-600">
+                  No analysis records stored in database yet.
                 </td>
               </tr>
             ) : (
@@ -68,21 +68,21 @@ export default function AnalysisHistory({ history = [], isLoading, onSelectRecor
                 <tr
                   key={item.id}
                   onClick={() => onSelectRecord && onSelectRecord(item)}
-                  className="hover:bg-slate-800/40 transition cursor-pointer group"
+                  className="hover:bg-slate-900/50 transition-colors cursor-pointer group"
                 >
-                  <td className="py-3 px-3 text-slate-500 font-bold">#{item.id}</td>
-                  <td className="py-3 px-3 text-slate-400">{formatDate(item.timestamp)}</td>
-                  <td className="py-3 px-3 text-slate-200 font-medium flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400" />
-                    <span className="truncate max-w-[180px]">{item.filename}</span>
+                  <td className="py-3 px-2 text-slate-600">#{item.id}</td>
+                  <td className="py-3 px-2 text-slate-500">{formatDate(item.timestamp)}</td>
+                  <td className="py-3 px-2 text-slate-400 flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-slate-700 group-hover:text-cyan-500/50" />
+                    <span className="truncate max-w-[150px]">{item.filename}</span>
                   </td>
-                  <td className="py-3 px-3">
-                    <span className={`inline-block px-2.5 py-0.5 rounded border text-[10px] font-bold ${getBadgeClass(item.condition)}`}>
+                  <td className="py-3 px-2">
+                    <span className={`inline-block px-2 py-0.5 rounded-sm border text-[9px] font-bold uppercase tracking-wider ${getBadgeClass(item.condition)}`}>
                       {item.condition}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-right font-bold text-slate-200">
-                    {item.confidence != null ? `${item.confidence.toFixed(2)}%` : '--'}
+                  <td className="py-3 px-2 text-right font-medium text-slate-400 group-hover:text-slate-200 transition-colors">
+                    {item.confidence != null ? `${item.confidence.toFixed(1)}%` : '--'}
                   </td>
                 </tr>
               ))
