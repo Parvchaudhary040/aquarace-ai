@@ -11,7 +11,8 @@ export default function AnalysisViewer({
   isLoadingVideo,
   videoResult,
   analysisMode = 'image',
-  onModeChange
+  onModeChange,
+  inferenceStatus = '',
 }) {
   const containerRef = useRef();
   useScrollAnimation(containerRef, 'scaleUp');
@@ -58,12 +59,13 @@ export default function AnalysisViewer({
 
       {/* Mode View Content */}
       {analysisMode === 'image' ? (
-        <ImageUploader onAnalyze={onAnalyze} isLoading={isLoadingImage} />
+        <ImageUploader onAnalyze={onAnalyze} isLoading={isLoadingImage} inferenceStatus={inferenceStatus} />
       ) : (
         <VideoUploader
           onAnalyzeVideo={onAnalyzeVideo}
           isLoading={isLoadingVideo}
           videoResult={videoResult}
+          inferenceStatus={inferenceStatus}
         />
       )}
 

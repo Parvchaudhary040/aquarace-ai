@@ -1,96 +1,138 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+"""
+analyze.py — Analysis API routes
+
+ARCHITECTURE CHANGE:
+  CLIP vision inference has moved to the browser frontend (Transformers.js).
+  The backend no longer calls Hugging Face or runs any vision model.
+
+  New endpoints accept pre-computed JSON results from the frontend and
+  persist them to the database so that /api/history, /api/trend, and
+  /api/strategy continue to work correctly.
+
+  POST /api/record-analysis  — persist a single image analysis result
+  POST /api/record-video     — persist video frame results + compute trend/strategy
+
+  The old POST /api/analyze and POST /api/analyze-video endpoints now
+  forward to the same logic using JSON bodies for backward compatibility.
+"""
+
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
+from typing import List
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import Analysis
 from app.models.schemas import AnalysisResponse, VideoAnalysisResponse
-from app.services.vision_service import vision_service
-from app.services.video_service import video_service
+from app.services.trend_service import analyze_trend
+from app.services.strategy_service import evaluate_strategy
 
 router = APIRouter()
 
-ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp"}
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+
+# ─── Request schemas for pre-computed frontend results ────────────────────────
+
+class AnalysisInput(BaseModel):
+    """Pre-computed image analysis result sent from the frontend CLIP pipeline."""
+    filename: str = "image"
+    condition: str
+    confidence: float
+    dry_probability: float = Field(default=0.0)
+    damp_probability: float = Field(default=0.0)
+    wet_probability: float = Field(default=0.0)
 
 
-@router.post("/analyze", response_model=AnalysisResponse)
-async def analyze_image(
-    file: UploadFile = File(...),
+class FrameInput(BaseModel):
+    """Single sampled video frame analysis result."""
+    timestamp: float
+    condition: str
+    confidence: float
+    dry_probability: float = Field(default=0.0)
+    damp_probability: float = Field(default=0.0)
+    wet_probability: float = Field(default=0.0)
+
+
+class VideoAnalysisInput(BaseModel):
+    """Pre-computed video analysis result sent from the frontend CLIP pipeline."""
+    filename: str = "video"
+    frames_analyzed: int = 0
+    frames: List[FrameInput] = []
+    condition_sequence: List[str] = []
+
+
+# ─── Image analysis endpoint ──────────────────────────────────────────────────
+
+@router.post("/record-analysis", response_model=AnalysisResponse)
+async def record_analysis(
+    data: AnalysisInput,
     db: Session = Depends(get_db)
 ):
     """
-    Classify track condition from uploaded image and record the analysis to SQLite database.
+    Persist a pre-computed image analysis result (from the frontend CLIP pipeline)
+    to the database. Returns a full AnalysisResponse with id and timestamp.
     """
-    filename = file.filename or "unknown.jpg"
-    file_ext = "." + filename.split(".")[-1].lower() if "." in filename else ""
-
-    # Validate image file
-    if file.content_type not in ALLOWED_MIME_TYPES and file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file type '{file.content_type}'. Must be a supported image file (.jpg, .jpeg, .png, .webp, .bmp)."
-        )
-
     try:
-        image_bytes = await file.read()
-        if not image_bytes:
-            raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
-
-        # Perform zero-shot model inference
-        result = vision_service.analyze_image(image_bytes)
-
-        # Save to database
         db_analysis = Analysis(
-            filename=filename,
-            condition=result["condition"],
-            confidence=result["confidence"],
-            dry_probability=result["dry_probability"],
-            damp_probability=result["damp_probability"],
-            wet_probability=result["wet_probability"]
+            filename=data.filename,
+            condition=data.condition,
+            confidence=data.confidence,
+            dry_probability=data.dry_probability,
+            damp_probability=data.damp_probability,
+            wet_probability=data.wet_probability,
         )
         db.add(db_analysis)
         db.commit()
         db.refresh(db_analysis)
-
         return db_analysis
-
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=f"Image analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to record analysis: {str(e)}")
 
 
-@router.post("/analyze-video", response_model=VideoAnalysisResponse)
-async def analyze_video(
-    file: UploadFile = File(...),
+# ─── Video analysis endpoint ──────────────────────────────────────────────────
+
+@router.post("/record-video", response_model=VideoAnalysisResponse)
+async def record_video(
+    data: VideoAnalysisInput,
     db: Session = Depends(get_db)
 ):
     """
-    Extracts frames from an uploaded track video, runs CLIP vision classification across frames,
-    computes temporal trend and tire strategy, and saves frame summary to database history.
+    Accepts pre-computed video frame results from the frontend CLIP pipeline.
+    Persists each frame to the database and computes trend + strategy server-side
+    so the existing /api/trend and /api/strategy endpoints stay accurate.
     """
-    filename = file.filename or "race_track.mp4"
-
     try:
-        video_bytes = await file.read()
+        if not data.frames:
+            raise HTTPException(status_code=400, detail="No frames provided in video analysis.")
 
-        # Process video frames, trend, and strategy
-        result = video_service.process_video(video_bytes, filename)
-
-        # Record each analyzed frame (or latest frame) to DB history so telemetry log stays in sync
-        for frame in result["frames"]:
+        # Persist each frame to DB history
+        for frame in data.frames:
             db_analysis = Analysis(
-                filename=f"{filename} @ {frame['timestamp']}s",
-                condition=frame["condition"],
-                confidence=frame["confidence"],
-                dry_probability=frame.get("dry_probability", 0.0),
-                damp_probability=frame.get("damp_probability", 0.0),
-                wet_probability=frame.get("wet_probability", 0.0)
+                filename=f"{data.filename} @ {frame.timestamp}s",
+                condition=frame.condition,
+                confidence=frame.confidence,
+                dry_probability=frame.dry_probability,
+                damp_probability=frame.damp_probability,
+                wet_probability=frame.wet_probability,
             )
             db.add(db_analysis)
         db.commit()
 
-        return result
+        # Build condition sequence (use provided sequence or derive from frames)
+        condition_sequence = data.condition_sequence or [f.condition for f in data.frames]
 
+        # Run trend and strategy engines (unchanged backend logic)
+        trend_result = analyze_trend(condition_sequence)
+        latest_condition = trend_result.get("condition") or condition_sequence[-1]
+        latest_trend = trend_result.get("trend", "stable")
+        strategy_result = evaluate_strategy(latest_condition, latest_trend, condition_sequence)
+
+        return {
+            "filename": data.filename,
+            "frames_analyzed": len(data.frames),
+            "frames": [f.model_dump() for f in data.frames],
+            "condition_sequence": condition_sequence,
+            "trend": trend_result,
+            "strategy": strategy_result,
+        }
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e

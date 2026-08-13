@@ -14,6 +14,27 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       }
+    },
+    headers: {
+      // Required for SharedArrayBuffer used by some WASM runtimes (Transformers.js)
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
     }
-  }
+  },
+  optimizeDeps: {
+    // Exclude transformers from pre-bundling — it ships its own ESM + WASM
+    exclude: ['@huggingface/transformers'],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split @huggingface/transformers into its own chunk (Rolldown function form)
+        manualChunks(id) {
+          if (id.includes('@huggingface/transformers')) {
+            return 'transformers';
+          }
+        },
+      },
+    },
+  },
 })

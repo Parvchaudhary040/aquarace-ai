@@ -74,6 +74,7 @@ export default function Dashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAnalyzingVideo, setIsAnalyzingVideo] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [inferenceStatus, setInferenceStatus] = useState('');
   
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isNavSticky, setIsNavSticky] = useState(false);
@@ -126,18 +127,22 @@ export default function Dashboard() {
 
   const handleAnalyze = async (file) => {
     setIsAnalyzing(true);
+    setInferenceStatus('');
     try {
       if (isDemoMode) {
+        setInferenceStatus('Running demo analysis…');
         await new Promise(r => setTimeout(r, 1500));
         setCurrentAnalysis(DEMO_ANALYSIS);
+        setInferenceStatus('Demo complete');
         await fetchAllTelemetry(DEMO_ANALYSIS);
       } else {
-        const result = await analyzeImage(file);
+        const result = await analyzeImage(file, (msg) => setInferenceStatus(msg));
         setCurrentAnalysis(result);
         await fetchAllTelemetry(result);
       }
     } catch (err) {
       console.error('Analysis failed:', err);
+      setInferenceStatus('');
       alert(err.message || 'Analysis failed.');
     } finally {
       setIsAnalyzing(false);
@@ -146,8 +151,10 @@ export default function Dashboard() {
 
   const handleAnalyzeVideo = async (file) => {
     setIsAnalyzingVideo(true);
+    setInferenceStatus('');
     try {
       if (isDemoMode) {
+        setInferenceStatus('Running demo video analysis…');
         await new Promise(r => setTimeout(r, 2000));
         setVideoResult(DEMO_VIDEO);
         setTrendData(DEMO_TREND);
@@ -155,8 +162,9 @@ export default function Dashboard() {
         const lastFrame = DEMO_VIDEO.frames[DEMO_VIDEO.frames.length - 1];
         setCurrentAnalysis(lastFrame);
         setHistoryData(DEMO_HISTORY);
+        setInferenceStatus('Demo complete');
       } else {
-        const result = await analyzeVideo(file);
+        const result = await analyzeVideo(file, (msg) => setInferenceStatus(msg));
         setVideoResult(result);
         if (result.trend) setTrendData(result.trend);
         if (result.strategy) setStrategyData(result.strategy);
@@ -168,6 +176,7 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error('Video analysis failed:', err);
+      setInferenceStatus('');
       alert(err.message || 'Video analysis failed.');
     } finally {
       setIsAnalyzingVideo(false);
@@ -250,6 +259,7 @@ export default function Dashboard() {
                 videoResult={videoResult}
                 analysisMode={analysisMode}
                 onModeChange={setAnalysisMode}
+                inferenceStatus={inferenceStatus}
               />
             </div>
 

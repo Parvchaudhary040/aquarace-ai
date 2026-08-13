@@ -4,7 +4,7 @@ import { UploadCloud, Film, AlertTriangle, RefreshCw, Sparkles, Play, Layers, Cl
 const ACCEPTED_VIDEO_FORMATS = ['video/mp4', 'video/x-msvideo', 'video/quicktime', 'video/x-matroska', 'video/webm'];
 const ACCEPTED_VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.webm'];
 
-export default function VideoUploader({ onAnalyzeVideo, isLoading, videoResult }) {
+export default function VideoUploader({ onAnalyzeVideo, isLoading, videoResult, inferenceStatus }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
@@ -177,10 +177,12 @@ export default function VideoUploader({ onAnalyzeVideo, isLoading, videoResult }
                   <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20">
                     <RefreshCw className="w-10 h-10 text-amber-400 animate-spin mb-3" />
                     <span className="text-sm font-mono font-bold tracking-widest text-amber-300 uppercase animate-pulse mb-1">
-                      ANALYZING TRACK VIDEO
+                      {inferenceStatus ? inferenceStatus.toUpperCase() : 'ANALYZING TRACK VIDEO'}
                     </span>
                     <p className="text-xs font-mono text-slate-400 max-w-xs">
-                      SAMPLING MULTI-FRAME SEQUENCE &amp; EVALUATING TEMPORAL TREND
+                      {inferenceStatus
+                        ? 'Local CLIP inference — no upload required'
+                        : 'SAMPLING MULTI-FRAME SEQUENCE &amp; EVALUATING TEMPORAL TREND'}
                     </p>
                     <div className="w-48 h-1.5 bg-slate-800 rounded-full mt-4 overflow-hidden border border-slate-700">
                       <div className="h-full bg-gradient-to-r from-amber-500 to-cyan-400 animate-[pulse_1s_infinite] w-full" />

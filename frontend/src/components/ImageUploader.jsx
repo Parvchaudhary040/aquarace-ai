@@ -4,7 +4,7 @@ import { UploadCloud, Image as ImageIcon, CheckCircle, AlertTriangle, RefreshCw,
 const ACCEPTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
 const ACCEPTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 
-export default function ImageUploader({ onAnalyze, isLoading }) {
+export default function ImageUploader({ onAnalyze, isLoading, inferenceStatus }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -136,11 +136,11 @@ export default function ImageUploader({ onAnalyze, isLoading }) {
 
             {/* Scanning Overlay Effect when Loading */}
             {isLoading && (
-              <div className="absolute inset-0 bg-cyan-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center">
+              <div className="absolute inset-0 bg-cyan-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 p-4">
                 <div className="w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent absolute top-0 animate-[bounce_2s_infinite]"></div>
-                <RefreshCw className="w-10 h-10 text-cyan-400 animate-spin mb-2" />
-                <span className="text-xs font-mono font-bold tracking-widest text-cyan-300 uppercase animate-pulse">
-                  RUNNING ZERO-SHOT AI INFERENCE...
+                <RefreshCw className="w-10 h-10 text-cyan-400 animate-spin" />
+                <span className="text-xs font-mono font-bold tracking-widest text-cyan-300 uppercase animate-pulse text-center">
+                  {inferenceStatus || 'ANALYZING TRACK…'}
                 </span>
               </div>
             )}
