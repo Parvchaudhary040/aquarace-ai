@@ -1,8 +1,11 @@
+import os
 import io
+import base64
 from pathlib import Path
 from typing import Union
 from PIL import Image
-from transformers import pipeline
+from fastapi import HTTPException
+import httpx
 
 CANDIDATE_LABELS = [
     "a dry racing track",
@@ -19,7 +22,7 @@ LABEL_DISPLAY = {
 
 class VisionService:
     _instance = None
-    _classifier = None
+    _token = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -27,21 +30,22 @@ class VisionService:
         return cls._instance
 
     def initialize(self):
-        """Pre-load Hugging Face CLIP model on startup."""
-        if self._classifier is None:
-            print("Loading Hugging Face model 'openai/clip-vit-base-patch32'...")
-            self._classifier = pipeline(
-                "zero-shot-image-classification",
-                model="openai/clip-vit-base-patch32"
-            )
-            print("Hugging Face CLIP vision model loaded successfully.")
+        """Verify Hugging Face token is available on startup."""
+        if self._token is None:
+            hf_token = os.getenv("HF_TOKEN")
+            if not hf_token:
+                raise HTTPException(status_code=500, detail="Configuration Error: HF_TOKEN environment variable is missing. Cannot initialize vision service.")
+            
+            print("Verified Hugging Face token for direct API access.")
+            self._token = hf_token
 
     def analyze_image(self, image_input: Union[bytes, str, Path]) -> dict:
         """
         Classifies an image (bytes, file path, or PIL Image) against Dry, Damp, and Wet track labels.
+        Uses direct HTTP POST to Hugging Face Inference API to bypass client routing issues.
         Returns a dict with condition, confidence, and dry/damp/wet probabilities.
         """
-        if self._classifier is None:
+        if self._token is None:
             self.initialize()
 
         # Handle bytes vs path vs PIL Image
@@ -54,7 +58,36 @@ class VisionService:
         else:
             raise ValueError(f"Unsupported image input type '{type(image_input)}'. Expected bytes, file path, or PIL Image.")
 
-        raw_results = self._classifier(image, candidate_labels=CANDIDATE_LABELS)
+        # Save to buffer and convert to base64
+        buffer = io.BytesIO()
+        image.thumbnail((512, 512)) # Shrink to save bandwidth
+        image.save(buffer, format="JPEG")
+        img_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        payload = {
+            "inputs": img_b64,
+            "parameters": {
+                "candidate_labels": CANDIDATE_LABELS
+            }
+        }
+
+        url = "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32"
+        headers = {"Authorization": f"Bearer {self._token}"}
+
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                response = client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                raw_results = response.json()
+                
+                # If API is loading model, it might return {"error": "Model is currently loading", "estimated_time": ...}
+                if isinstance(raw_results, dict) and "error" in raw_results:
+                    print(f"HF API returning error: {raw_results}")
+                    raise Exception(raw_results.get("error"))
+                    
+        except Exception as e:
+            print(f"HF Inference API Error: {e}")
+            raise HTTPException(status_code=503, detail="Vision inference service is temporarily unavailable.")
 
         # Parse probabilities for each candidate label
         prob_dict = {res["label"]: res["score"] * 100 for res in raw_results}
@@ -79,3 +112,4 @@ class VisionService:
 
 # Singleton instance
 vision_service = VisionService()
+

@@ -81,6 +81,15 @@ def main():
     print("  AquaRace AI - PS2 Track Condition Zero-Shot Classifier Test    ")
     print("=================================================================")
     
+    import os
+    if not os.getenv("HF_TOKEN"):
+        print("Error: HF_TOKEN environment variable is missing.")
+        print("Please set your Hugging Face API token before running this test:")
+        print("  Windows (CMD):        set HF_TOKEN=your_token")
+        print("  Windows (PowerShell): $env:HF_TOKEN=\"your_token\"")
+        print("  Linux/Mac:            export HF_TOKEN=your_token")
+        sys.exit(1)
+
     # Initialize vision service (reuses singleton model instance)
     vision_service.initialize()
     print(f"Processing {len(image_files)} image(s) from: '{target_input}'\n")

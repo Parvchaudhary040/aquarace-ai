@@ -9,12 +9,10 @@ from app.models.schemas import HealthResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup logic
     print("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
     
-    print("Pre-loading Hugging Face vision model...")
-    vision_service.initialize()
+    print("Application started.")
     yield
     # Shutdown logic
     print("Shutting down AquaRace AI Backend...")

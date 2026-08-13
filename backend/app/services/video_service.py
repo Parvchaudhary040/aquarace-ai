@@ -94,6 +94,9 @@ class VideoService:
                 frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
                 pil_image = Image.fromarray(frame_rgb)
 
+                # Resize frame to save RAM and Inference API bandwidth
+                pil_image.thumbnail((512, 512))
+
                 # Send sampled frame through existing vision_service
                 analysis = vision_service.analyze_image(pil_image)
 
