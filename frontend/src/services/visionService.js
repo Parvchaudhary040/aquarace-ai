@@ -17,17 +17,30 @@ import { pipeline } from '@huggingface/transformers';
 
 const MODEL_ID = 'Xenova/clip-vit-base-patch32';
 
-const CANDIDATE_LABELS = [
-  'a dry racing track',
-  'a damp racing track',
-  'a wet racing track',
-];
-
-const LABEL_DISPLAY = {
-  'a dry racing track': 'Dry',
-  'a damp racing track': 'Damp',
-  'a wet racing track': 'Wet',
+// Each class is represented by two complementary prompts. This is more robust
+// than relying on one wording for a zero-shot model, while still requiring one
+// image embedding and a small set of text embeddings per inference.
+const CONDITION_PROMPTS = {
+  Dry: [
+    'a dry asphalt racing track',
+    'a race circuit with a dry racing line',
+  ],
+  Damp: [
+    'a damp asphalt racing track',
+    'a race circuit with a moist dark track surface',
+  ],
+  Wet: [
+    'a wet asphalt racing track with standing water',
+    'a race circuit with rain puddles and reflections',
+  ],
 };
+
+const CANDIDATE_LABELS = Object.values(CONDITION_PROMPTS).flat();
+const PROMPT_CONDITION = Object.fromEntries(
+  Object.entries(CONDITION_PROMPTS).flatMap(([condition, prompts]) =>
+    prompts.map((prompt) => [prompt, condition])
+  )
+);
 
 /** Max dimension (px) to resize a frame before inference to reduce memory usage */
 const FRAME_MAX_DIM = 224;
@@ -82,23 +95,27 @@ export async function getClassifier(onProgress) {
  * @returns {{ condition, confidence, dry_probability, damp_probability, wet_probability, filename }}
  */
 function parseResults(results, filename = 'image') {
-  const probMap = {};
-  for (const r of results) {
-    probMap[r.label] = r.score * 100;
+  const probabilities = { Dry: 0, Damp: 0, Wet: 0 };
+  for (const result of results) {
+    const condition = PROMPT_CONDITION[result.label];
+    if (condition) probabilities[condition] += result.score;
   }
 
-  // results[0] is the top prediction (highest score)
-  const top = results[0];
-  const condition = LABEL_DISPLAY[top.label] ?? top.label;
-  const confidence = Math.round(top.score * 10000) / 100; // 2 decimals
+  const total = Object.values(probabilities).reduce((sum, score) => sum + score, 0) || 1;
+  for (const condition of Object.keys(probabilities)) {
+    probabilities[condition] = (probabilities[condition] / total) * 100;
+  }
+
+  const [condition, confidence] = Object.entries(probabilities)
+    .sort(([, left], [, right]) => right - left)[0];
 
   return {
     filename,
     condition,
-    confidence,
-    dry_probability: Math.round((probMap['a dry racing track'] ?? 0) * 100) / 100,
-    damp_probability: Math.round((probMap['a damp racing track'] ?? 0) * 100) / 100,
-    wet_probability: Math.round((probMap['a wet racing track'] ?? 0) * 100) / 100,
+    confidence: Math.round(confidence * 100) / 100,
+    dry_probability: Math.round(probabilities.Dry * 100) / 100,
+    damp_probability: Math.round(probabilities.Damp * 100) / 100,
+    wet_probability: Math.round(probabilities.Wet * 100) / 100,
   };
 }
 
@@ -111,6 +128,43 @@ function parseResults(results, filename = 'image') {
  */
 async function runClip(imageSource, classifier) {
   return classifier(imageSource, CANDIDATE_LABELS);
+}
+
+/**
+ * Reduces single-frame flicker in video classifications by applying a
+ * weighted, three-frame moving average to class probabilities.
+ * The first and last frames use the available neighbours only.
+ */
+function stabilizeVideoFrames(frames) {
+  const probabilityKeys = ['dry_probability', 'damp_probability', 'wet_probability'];
+  const labels = ['Dry', 'Damp', 'Wet'];
+
+  return frames.map((frame, index) => {
+    const blended = Object.fromEntries(probabilityKeys.map((key) => [key, 0]));
+    let weightTotal = 0;
+
+    for (let offset = -1; offset <= 1; offset++) {
+      const neighbour = frames[index + offset];
+      if (!neighbour) continue;
+
+      const weight = offset === 0 ? 0.6 : 0.2;
+      weightTotal += weight;
+      for (const key of probabilityKeys) blended[key] += neighbour[key] * weight;
+    }
+
+    for (const key of probabilityKeys) blended[key] /= weightTotal;
+    const winner = probabilityKeys.reduce((best, key) => blended[key] > blended[best] ? key : best, probabilityKeys[0]);
+    const winnerIndex = probabilityKeys.indexOf(winner);
+
+    return {
+      ...frame,
+      condition: labels[winnerIndex],
+      confidence: Math.round(blended[winner] * 100) / 100,
+      dry_probability: Math.round(blended.dry_probability * 100) / 100,
+      damp_probability: Math.round(blended.damp_probability * 100) / 100,
+      wet_probability: Math.round(blended.wet_probability * 100) / 100,
+    };
+  });
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -246,7 +300,6 @@ export async function analyzeVideoLocally(file, onProgress) {
 
     const timestamps = computeSampleTimestamps(duration);
     const frameResults = [];
-    const conditionSequence = [];
 
     for (let i = 0; i < timestamps.length; i++) {
       const ts = timestamps[i];
@@ -268,16 +321,18 @@ export async function analyzeVideoLocally(file, onProgress) {
         damp_probability: analysis.damp_probability,
         wet_probability: analysis.wet_probability,
       });
-      conditionSequence.push(analysis.condition);
     }
+
+    const stabilizedFrames = stabilizeVideoFrames(frameResults);
+    const stabilizedSequence = stabilizedFrames.map((frame) => frame.condition);
 
     onProgress?.('Video analysis complete');
 
     return {
       filename: file.name,
-      frames_analyzed: frameResults.length,
-      frames: frameResults,
-      condition_sequence: conditionSequence,
+      frames_analyzed: stabilizedFrames.length,
+      frames: stabilizedFrames,
+      condition_sequence: stabilizedSequence,
     };
   } finally {
     // Clean up

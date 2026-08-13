@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import TrendChart from '../TrendChart';
 import { useScrollAnimation } from '../../hooks/useScrollAnimation';
 import { Layers } from 'lucide-react';

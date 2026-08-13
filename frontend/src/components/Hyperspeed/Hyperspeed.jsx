@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { BloomEffect, EffectComposer, EffectPass, RenderPass, SMAAEffect, SMAAPreset } from 'postprocessing';
 import { isWebGLAvailable } from '../../utils/webglDetect';
@@ -72,7 +72,7 @@ const deepUniforms = {
   uPowY: { value: new THREE.Vector2(20, 2) }
 };
 
-export const distortions = {
+const distortions = {
   mountainDistortion: {
     uniforms: mountainUniforms,
     getDistortion: `
