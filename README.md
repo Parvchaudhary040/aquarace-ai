@@ -23,6 +23,11 @@ AquaRace AI is a full-stack motorsport intelligence dashboard designed to analyz
 
 ---
 
+## 📚 Documentation
+
+- [Execution Flow](./flow.md) — Complete code execution flow, entry points, function calls, and execution order.
+
+---
 
 ## ✨ Key Features
 
