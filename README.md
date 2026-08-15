@@ -749,10 +749,13 @@ Potential next steps:
 
 Built as an AI-powered motorsport analytics and decision-support prototype combining computer vision, full-stack development, data persistence, visualization, and deployment.
 
-**Author:** Parv Chaudhary
+**Collaborator 1:** Parv Chaudhary
 
 - GitHub: https://github.com/Parvchaudhary040
-- Project: https://github.com/Parvchaudhary040/aquarace-ai
+
+**Collaborator 2:** Shourya Jaiswal
+
+- GitHub: https://github.com/jaiswalshourya33 
 
 ---
 
